@@ -21,25 +21,25 @@ cp mysql_backup /usr/bin/mysql_backup
 $ yum install xtrabackup zstd # 安装依赖
 $ mysql_backup
 
-input: {'bak_mode': 0, 'bak_dir': None, 'keep': 2, 'weekday': None, 'my_cnf': '/etc/my.cnf', 'log_bin': None}
+input: {'bak_mode': 0, 'bak_dir': None, 'keep': 2, 'weekday': 6, 'my_cnf': '/etc/my.cnf', 'log_bin': None}
 error: --bak-dir=None
-usage: mysql_backup [-h] [--bak-mode BAK_MODE] [--bak-dir BAK_DIR] [--keep KEEP] [--weekday WEEKDAY] [--my-cnf MY_CNF] [--log-bin LOG_BIN]
+usage: mysql_backup.py [-h] [--bak-mode BAK_MODE] [--bak-dir BAK_DIR] [--keep KEEP] [--weekday WEEKDAY] [--my-cnf MY_CNF] [--log-bin LOG_BIN]
 
-MySQL周度全量、增量、日志备份，使用xtrabackup+zstd最佳组合，Version=v1.0.0
-混合备份：mysql_backup --bak-mode=0 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf --log-bin=/var/lib/mysql/mysql-bin
-数据备份：mysql_backup --bak-mode=1 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf
-日志备份：mysql_backup --bak-mode=2 --bak-dir=/backup --log-bin=/var/lib/mysql/mysql-bin
+MySQL周度全量、增量、日志备份，使用xtrabackup+zstd最佳组合，Version=v1.1.0
+数据备份：mysql_backup --bak-mode=0 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf
+日志备份：mysql_backup --bak-mode=1 --bak-dir=/backup --log-bin=/var/lib/mysql/mysql-bin
+混合备份：mysql_backup --bak-mode=2 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf --log-bin=/var/lib/mysql/mysql-bin
 
 options:
   -h, --help           show this help message and exit
 
 基础选项:
-  --bak-mode BAK_MODE  0=数据+日志，1=数据，2=日志 (default: 0)
+  --bak-mode BAK_MODE  0=数据，1=日志，2=数据+日志 (default: 0)
   --bak-dir BAK_DIR    备份文件目录 (default: None)
   --keep KEEP          保留几周(>=1) (default: 2)
 
 数据备份选项:
-  --weekday WEEKDAY    周几全量备份(1~7) (default: None)
+  --weekday WEEKDAY    周几全量备份(1~7) (default: 6)
   --my-cnf MY_CNF      配置文件路径 (default: /etc/my.cnf)
 
 日志备份选项:
@@ -59,7 +59,8 @@ options:
 - 日志`1G -> 80M`
 
 ```shell
-$ cd $bak-dir && ll -hR
+# cd $bak-dir
+$ ll -hR
 
 total 0
 drw-r--r--. 2 root root 173 Jul 17 00:00 data
@@ -76,16 +77,22 @@ total 288M
 -rw-r-----. 1 root root 80M Jul 15 00:00 20240716_LOGS_mysql-bin.000302.zst
 -rw-r-----. 1 root root 80M Jul 16 00:00 20240717_LOGS_mysql-bin.000303.zst
 -rw-r-----. 1 root root 36M Jul 17 00:00 20240717_LOGS_mysql-bin.000304.zst
+
+# 增量备份依赖上一个全量备份，增量文件的from_lsn即是全量文件的to_lsn，通过lsn检索历史备份
+$ ll -h data | grep 345489064825
+-rw-r--r--. 1 root root 681M Jul 15 00:00 20240715_FULL_0_345489064825.xb.zst
+-rw-r--r--. 1 root root  13M Jul 16 00:00 20240716_INCR_345489064825_346086160276.xb.zst
+-rw-r--r--. 1 root root  15M Jul 17 00:00 20240717_INCR_345489064825_347259222639.xb.zst
 ```
 
 ## 其它
 
 ### 方案
 
-- v1，弃用
+- v1，弃用，表级文件备份存储（随机写速度慢），单文件压缩，且压缩率较低（依赖qpress）
     - 全量：`--backup --parallel --compress --compress-threads --target-dir=full_backup`
     - 增量：`--backup --parallel --compress --compress-threads --target-dir=incr_backup --incremental-basedir=full_backup`
-- v2，当前，备份效率（大小、时间）相比v1提升30%左右
+- v2，当前，流式打包压缩存储（顺序写速度快），备份效率（大小、时间）相比提升30%左右
     - 全量：`--backup --parallel --stream=xbstream | zstd -o full_backup_lsn.xb.zst`
     - 增量：`--backup --parallel --stream=xbstream --incremental-lsn=full_backup_lsn | zstd -o incr_backup_lsn.xb.zst`
 
@@ -97,9 +104,9 @@ total 288M
   logs: {date}_{type}_{name}.zst
 
 最佳实践：
-  --bak-mode：小实例，bak-mode=0，统一备份；大实例，数据每天一次、日志每时一次，独立备份
-  --weekday：存在多实例备份时，受统一存储（例如：NFS）磁盘IO限制，通过weekday将不同实例全量备份灵活分散到周内非同一天
-  --keep：默认保留2周（14天），按天滚动删除历史备份文件，视存储大小而定
+  --bak-mode：小实例，数据日志统一备份；大实例，数据每天一次、日志每时一次，独立备份
+  --weekday：存在多实例时，受存储（例如：NFS）磁盘IO限制，通过weekday指定全量哪一天备份
+  --keep：默认保留2周（14天），按天滚动删除历史备份文件，视存储容量、归档策略而定
 
 备份还原：
   mkdir backup && zstd -d -c backup.xb.zst | xbstream -v -x -C ./backup
