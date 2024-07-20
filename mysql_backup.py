@@ -92,7 +92,7 @@ class DataBackup(Backup):
         while True:
             output = shell.stdout.readline().rstrip()
             print(output)
-            if output.startswith('xtrabackup: The latest check point'):
+            if 'The latest check point (for incremental)' in output:
                 t = output.split("'")[1]
             if shell.poll() is not None:
                 break
