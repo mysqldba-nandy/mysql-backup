@@ -5,7 +5,7 @@ weekly mysql data(full+incr)/logs backup using xtrabackup
 ## 准备
 
 ```shell
-# 依赖
+# 打包（也可以直接python3 mysql_backup.py，但打包成可执行文件，就可以在其它服务器上独立运行而不依赖python）
 pip3 install pyinstaller
 # 编译
 sh mysql_backup_build.sh
@@ -23,9 +23,9 @@ $ mysql_backup
 
 input: {'bak_mode': 0, 'bak_dir': None, 'keep': 2, 'weekday': 6, 'my_cnf': '/etc/my.cnf', 'log_bin': None}
 error: --bak-dir=None
-usage: mysql_backup.py [-h] [--bak-mode BAK_MODE] [--bak-dir BAK_DIR] [--keep KEEP] [--weekday WEEKDAY] [--my-cnf MY_CNF] [--log-bin LOG_BIN]
+usage: mysql_backup [-h] [--bak-mode BAK_MODE] [--bak-dir BAK_DIR] [--keep KEEP] [--weekday WEEKDAY] [--my-cnf MY_CNF] [--log-bin LOG_BIN]
 
-MySQL周度全量、增量、日志备份，使用xtrabackup+zstd最佳组合，Version=v1.1.0
+MySQL周度全量、增量、日志备份，使用xtrabackup+zstd最佳组合，Version=v1.1.2
 数据备份：mysql_backup --bak-mode=0 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf
 日志备份：mysql_backup --bak-mode=1 --bak-dir=/backup --log-bin=/var/lib/mysql/mysql-bin
 混合备份：mysql_backup --bak-mode=2 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf --log-bin=/var/lib/mysql/mysql-bin
@@ -100,7 +100,7 @@ $ ll -h data | grep 345489064825
 
 ```
 文件命名：
-  data: {date}_{type}_{from_lsn}_{t_lsn}.xb.zst
+  data: {date}_{type}_{from_lsn}_{to_lsn}.xb.zst
   logs: {date}_{type}_{name}.zst
 
 最佳实践：
