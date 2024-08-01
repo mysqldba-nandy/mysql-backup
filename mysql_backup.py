@@ -31,7 +31,7 @@ class Backup:
         # 删除历史
         date = (TODAY - datetime.timedelta(days=self.keep * 7)).strftime(FORMAT)
         for file in self.history:
-            if file.split('_')[0] < date:
+            if file.split('_')[0] <= date:
                 os.remove(os.path.join(self.base_dir, file))
 
     def backup_cmd(self):
