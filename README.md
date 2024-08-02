@@ -25,7 +25,7 @@ input: {'bak_mode': 0, 'bak_dir': None, 'keep': 2, 'weekday': 6, 'my_cnf': '/etc
 error: --bak-dir=None
 usage: mysql_backup [-h] [--bak-mode BAK_MODE] [--bak-dir BAK_DIR] [--keep KEEP] [--weekday WEEKDAY] [--my-cnf MY_CNF] [--log-bin LOG_BIN]
 
-MySQL周度全量、增量、日志备份，使用xtrabackup+zstd最佳组合，Version=v1.1.2
+MySQL周度全量、增量、日志备份，使用xtrabackup+zstd最佳组合，Version=v1.1.3
 数据备份：mysql_backup --bak-mode=0 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf
 日志备份：mysql_backup --bak-mode=1 --bak-dir=/backup --log-bin=/var/lib/mysql/mysql-bin
 混合备份：mysql_backup --bak-mode=2 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf --log-bin=/var/lib/mysql/mysql-bin
@@ -41,6 +41,7 @@ options:
 数据备份选项:
   --weekday WEEKDAY    周几全量备份(1~7) (default: 6)
   --my-cnf MY_CNF      配置文件路径 (default: /etc/my.cnf)
+  --executor EXECUTOR  可执行文件：mariabackup, /usr/bin/xtrabackup (default: xtrabackup)  
 
 日志备份选项:
   --log-bin LOG_BIN    日志读取路径，show variables like 'log_bin_basename' (default: None)
@@ -49,8 +50,8 @@ options:
 ## 定时
 
 ```crontab
-0 0 20 * * mysql_backup --bak-mode=1 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf
-0 0  * * * mysql_backup --bak-mode=2 --bak-dir=/backup --log-bin=/var/lib/mysql/mysql-bin
+0 0 20 * * mysql_backup --bak-mode=0 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf
+0 0  * * * mysql_backup --bak-mode=1 --bak-dir=/backup --log-bin=/var/lib/mysql/mysql-bin
 ```
 
 ## 效果
