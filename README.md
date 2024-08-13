@@ -19,11 +19,9 @@ cp mysql_backup /usr/bin/mysql_backup
 
 ```shell
 $ yum install xtrabackup zstd # 安装依赖
-$ mysql_backup
+$ mysql_backup -h
 
-input: {'bak_mode': 0, 'bak_dir': None, 'keep': 2, 'weekday': 6, 'my_cnf': '/etc/my.cnf', 'log_bin': None}
-error: --bak-dir=None
-usage: mysql_backup [-h] [--bak-mode BAK_MODE] [--bak-dir BAK_DIR] [--keep KEEP] [--weekday WEEKDAY] [--my-cnf MY_CNF] [--log-bin LOG_BIN]
+usage: mysql_backup [-h] [--bak-mode BAK_MODE] [--bak-dir BAK_DIR] [--keep KEEP] [--weekday WEEKDAY] [--my-cnf MY_CNF] [--executor EXECUTOR] [--log-bin LOG_BIN]
 
 MySQL周度全量、增量、日志备份，使用xtrabackup+zstd最佳组合，Version=v1.1.4
 数据备份：mysql_backup --bak-mode=0 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf
@@ -41,7 +39,7 @@ options:
 数据备份选项:
   --weekday WEEKDAY    周几全量备份(1~7) (default: 6)
   --my-cnf MY_CNF      配置文件路径 (default: /etc/my.cnf)
-  --executor EXECUTOR  可执行文件：mariabackup, /usr/bin/xtrabackup (default: xtrabackup)  
+  --executor EXECUTOR  可执行文件：mariabackup, /usr/bin/xtrabackup (default: xtrabackup)
 
 日志备份选项:
   --log-bin LOG_BIN    日志读取路径，show variables like 'log_bin_basename' (default: None)
@@ -75,8 +73,8 @@ total 708M
 
 ./logs:
 total 288M
--rw-r-----. 1 root root 80M Jul 15 00:00 20240716_LOGS_mysql-bin.000302.zst
--rw-r-----. 1 root root 80M Jul 16 00:00 20240717_LOGS_mysql-bin.000303.zst
+-rw-r-----. 1 root root 80M Jul 15 00:00 20240715_LOGS_mysql-bin.000302.zst
+-rw-r-----. 1 root root 80M Jul 16 00:00 20240716_LOGS_mysql-bin.000303.zst
 -rw-r-----. 1 root root 36M Jul 17 00:00 20240717_LOGS_mysql-bin.000304.zst
 
 # 增量备份依赖上一个全量备份，增量文件的from_lsn即是全量文件的to_lsn，通过lsn检索历史备份
@@ -106,6 +104,7 @@ $ ll -h data | grep 345489064825
 
 最佳实践：
   --bak-mode：小实例，数据日志统一备份；大实例，数据每天一次、日志每时一次，独立备份
+  --bak-dir：存在多实例时，需要为每个实例设置单独的备份目录
   --weekday：存在多实例时，受存储（例如：NFS）磁盘IO限制，通过weekday指定全量哪一天备份
   --keep：默认保留2周（14天），按天滚动删除历史备份文件，视存储容量、归档策略而定
 
