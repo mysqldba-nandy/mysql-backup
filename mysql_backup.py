@@ -31,8 +31,9 @@ class Backup:
         # 删除历史
         date = (TODAY - datetime.timedelta(days=self.keep * 7)).strftime(FORMAT)
         for file in self.history:
-            if file.split('_')[0] <= date:
-                os.remove(os.path.join(self.base_dir, file))
+            if file.split('_')[0] > date:
+                return
+            os.remove(os.path.join(self.base_dir, file))
 
     def backup_cmd(self):
         # 执行命令
@@ -69,7 +70,7 @@ class Backup:
     @property
     def history(self):
         # 历史备份
-        return list(filter(self.filter, os.listdir(self.base_dir)))
+        return sorted(filter(self.filter, os.listdir(self.base_dir)))
 
 
 class DataBackup(Backup):
@@ -186,7 +187,7 @@ class LogsBackup(Backup):
 def parse_args(argv):
     parser = ArgumentParser(
         description='\n'.join([
-            'MySQL周度全量、增量、日志备份，使用xtrabackup+zstd最佳组合，Version=v1.1.3',
+            'MySQL周度全量、增量、日志备份，使用xtrabackup+zstd最佳组合，Version=v1.1.4',
             '数据备份：mysql_backup --bak-mode=0 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf',
             '日志备份：mysql_backup --bak-mode=1 --bak-dir=/backup --log-bin=/var/lib/mysql/mysql-bin',
             '混合备份：mysql_backup --bak-mode=2 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf --log-bin=/var/lib/mysql/mysql-bin',
