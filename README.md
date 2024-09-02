@@ -23,7 +23,7 @@ $ mysql_backup -h
 
 usage: mysql_backup [-h] [--bak-mode BAK_MODE] [--bak-dir BAK_DIR] [--keep KEEP] [--weekday WEEKDAY] [--my-cnf MY_CNF] [--executor EXECUTOR] [--log-bin LOG_BIN]
 
-MySQL周度全量、增量、日志备份，使用xtrabackup+zstd最佳组合，Version=v1.1.4
+MySQL周度全量、增量、日志备份，使用xtrabackup+zstd最佳组合，Version=v1.1.5
 数据备份：mysql_backup --bak-mode=0 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf
 日志备份：mysql_backup --bak-mode=1 --bak-dir=/backup --log-bin=/var/lib/mysql/mysql-bin
 混合备份：mysql_backup --bak-mode=2 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf --log-bin=/var/lib/mysql/mysql-bin
@@ -31,7 +31,7 @@ MySQL周度全量、增量、日志备份，使用xtrabackup+zstd最佳组合，
 options:
   -h, --help           show this help message and exit
 
-基础选项:
+基础备份选项:
   --bak-mode BAK_MODE  0=数据，1=日志，2=数据+日志 (default: 0)
   --bak-dir BAK_DIR    备份文件目录 (default: None)
   --keep KEEP          保留几周(>=1) (default: 2)
