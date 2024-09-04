@@ -4,7 +4,7 @@
 cd $(dirname $0)
 
 # build
-pyinstaller --clean --onefile mysql_backup.py
+pyinstaller --clean --onefile main.py --name mysql_backup
 mv dist/mysql_backup .
 
 # clean

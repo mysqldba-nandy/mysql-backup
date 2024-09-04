@@ -4,13 +4,22 @@ weekly mysql data(full+incr)/logs backup using xtrabackup
 
 ## 准备
 
+- golang版（推荐，不受环境限制，文件小`2+mb`）
 ```shell
-# 打包（也可以直接python3 mysql_backup.py，但打包成可执行文件，就可以在其它服务器上独立运行而不依赖python）
-pip3 install pyinstaller
+# 可直接下载 Releases 可执行文件
+cd golang/
 # 编译
-sh mysql_backup_build.sh
-# 授权
-chmod +x mysql_backup
+go build -ldflags '-s'
+# 安装
+cp mysql_backup /usr/bin/mysql_backup
+```
+- python版（受限，编译环境影响，文件大`13+mb`）
+```shell
+# 也可以直接python3 main.py，打包成可执行文件可在其它服务器上独立运行而不依赖python
+pip3 install pyinstaller
+cd python/
+# 编译
+sh build.sh
 # 安装
 cp mysql_backup /usr/bin/mysql_backup
 ```
@@ -23,7 +32,7 @@ $ mysql_backup -h
 
 usage: mysql_backup [-h] [--bak-mode BAK_MODE] [--bak-dir BAK_DIR] [--keep KEEP] [--weekday WEEKDAY] [--my-cnf MY_CNF] [--executor EXECUTOR] [--log-bin LOG_BIN]
 
-MySQL周度全量、增量、日志备份，使用xtrabackup+zstd最佳组合，Version=v1.1.5
+MySQL周度全量、增量、日志备份，使用xtrabackup+zstd最佳组合，Version=v2.0.0
 数据备份：mysql_backup --bak-mode=0 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf
 日志备份：mysql_backup --bak-mode=1 --bak-dir=/backup --log-bin=/var/lib/mysql/mysql-bin
 混合备份：mysql_backup --bak-mode=2 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf --log-bin=/var/lib/mysql/mysql-bin
@@ -35,6 +44,7 @@ options:
   --bak-mode BAK_MODE  0=数据，1=日志，2=数据+日志 (default: 0)
   --bak-dir BAK_DIR    备份文件目录 (default: None)
   --keep KEEP          保留几周(>=1) (default: 2)
+  --dry-run            打印命令而不实际执行  
 
 数据备份选项:
   --weekday WEEKDAY    周几全量备份(1~7) (default: 6)

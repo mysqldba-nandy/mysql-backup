@@ -4,7 +4,6 @@ import sys
 import datetime
 import subprocess
 from collections import namedtuple
-from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter, RawTextHelpFormatter
 
 BackupType = namedtuple('BackupType', ['full', 'incr', 'logs'])(full='FULL', incr='INCR', logs='LOGS')
 TODAY = datetime.date.today()
@@ -13,13 +12,13 @@ FORMAT = '%Y%m%d'
 
 class Backup:
 
-    def __init__(self, bak_dir: str, keep: int):
+    def __init__(self, bak_dir: str, keep: int, dry_run: bool):
         self.bak_dir = bak_dir  # 备份目录
         self.keep = keep  # 保留几周
-        self.create_dir()
-        self.last_name = self._get_last_name()
+        self.dry_run = dry_run
 
     def run(self):
+        self.create_dir()
         self.remove_old()
         self.backup_cmd()
 
@@ -29,6 +28,8 @@ class Backup:
 
     def remove_old(self):
         # 删除历史
+        if self.dry_run:
+            return
         date = (TODAY - datetime.timedelta(days=self.keep * 7)).strftime(FORMAT)
         for file in self.history:
             if file.split('_')[0] > date:
@@ -45,6 +46,11 @@ class Backup:
         raise
 
     @property
+    def file_type(self):
+        # 文件类型
+        raise
+
+    @property
     def name_tpl(self):
         # 命名模板
         raise
@@ -55,11 +61,7 @@ class Backup:
         raise
 
     @property
-    def file_type(self):
-        # 文件类型
-        raise
-
-    def _get_last_name(self):
+    def last_name(self):
         # 上次备份
         raise
 
@@ -74,22 +76,21 @@ class Backup:
 
 
 class DataBackup(Backup):
-    def __init__(self, bak_dir: str, keep: int, weekday: int, my_cnf: str, executor: str):
-        super().__init__(bak_dir, keep)
+    def __init__(self, bak_dir: str, keep: int, dry_run: bool, weekday: int, my_cnf: str, executor: str):
+        super().__init__(bak_dir, keep, dry_run)
         self.weekday = weekday
         self.my_cnf = my_cnf
         self.executor = executor
 
     def backup_cmd(self):
         tmp_name = os.path.join(self.base_dir, 'tmp_backup' + self.file_type)
-        if self.backup_type == BackupType.full:
-            f, t = '0', ''
-            incr = ''
-        else:
-            f, t = self.last_name.split('_')[3], ''
-            incr = f"--incremental-lsn={f}"
-        cmd = f'{self.executor} --defaults-file={self.my_cnf} --backup --parallel=4 --stream=xbstream --target-dir=/tmp {incr}| zstd -fkT4 -o {tmp_name}'
+        f, t = '0', ''
+        if self.backup_type == BackupType.incr:
+            f = self.last_name.split('_')[3]
+        cmd = f'{self.executor} --defaults-file={self.my_cnf} --backup --parallel=4 --stream=xbstream --target-dir=/tmp --incremental-lsn={f} | zstd -fkT4 -o {tmp_name}'
         print(datetime.datetime.now(), 'execute', cmd, flush=True)
+        if self.dry_run:
+            return
         shell = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True, universal_newlines=True)
         while True:
             output = shell.stdout.readline().rstrip()
@@ -111,6 +112,10 @@ class DataBackup(Backup):
         return os.path.join(self.bak_dir, 'data')
 
     @property
+    def file_type(self):
+        return '.xb.zst'
+
+    @property
     def name_tpl(self):
         return '{date}_{type}_{f}_{t}' + self.file_type
 
@@ -124,10 +129,7 @@ class DataBackup(Backup):
         return BackupType.incr
 
     @property
-    def file_type(self):
-        return '.xb.zst'
-
-    def _get_last_name(self):
+    def last_name(self):
         for name in reversed(self.history):
             if BackupType.full in name:
                 return name.replace(self.file_type, '')
@@ -138,12 +140,12 @@ class DataBackup(Backup):
 
 
 class LogsBackup(Backup):
-    def __init__(self, bak_dir: str, keep: int, log_bin: str):
-        super().__init__(bak_dir, keep)
+    def __init__(self, bak_dir: str, keep: int, dry_run: bool, log_bin: str):
+        super().__init__(bak_dir, keep, dry_run)
         self.log_bin = log_bin
 
     def backup_cmd(self):
-        log_dir, basename = os.path.dirname(self.log_bin), os.path.basename(self.log_bin)
+        log_dir, basename = os.path.split(self.log_bin)
         log_files = list(sorted(filter(lambda x: re.compile(basename + r'\.\d{6}').match(x), os.listdir(log_dir))))
         last_max = self.last_name.split('_')[-1]
         if last_max == '':
@@ -154,14 +156,20 @@ class LogsBackup(Backup):
         for file in log_files:
             bak_name = os.path.join(self.base_dir, self.name_tpl.format(date=TODAY.strftime(FORMAT), type=self.backup_type, name=file))
             cmd = f'zstd -fkT4 {os.path.join(log_dir, file)} -o {bak_name}'
-            os.system(cmd)
             print(datetime.datetime.now(), 'SUCCESS', cmd, flush=True)
+            if self.dry_run:
+                return
+            os.system(cmd)
             if file == last_max:
                 os.remove(os.path.join(self.base_dir, self.last_name + self.file_type))
 
     @property
     def base_dir(self):
         return os.path.join(self.bak_dir, 'logs')
+
+    @property
+    def file_type(self):
+        return '.zst'
 
     @property
     def name_tpl(self):
@@ -172,84 +180,10 @@ class LogsBackup(Backup):
         return BackupType.logs
 
     @property
-    def file_type(self):
-        return '.zst'
-
-    def _get_last_name(self):
+    def last_name(self):
         if len(self.history):
             return self.history[-1].replace(self.file_type, '')
         return ''
 
     def filter(self, name: str) -> bool:
         return name.endswith(self.file_type) and len(name.split('_')) == 3
-
-
-def parse_args(argv):
-    parser = ArgumentParser(
-        description='\n'.join([
-            'MySQL周度全量、增量、日志备份，使用xtrabackup+zstd最佳组合，Version=v1.1.5',
-            '数据备份：mysql_backup --bak-mode=0 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf',
-            '日志备份：mysql_backup --bak-mode=1 --bak-dir=/backup --log-bin=/var/lib/mysql/mysql-bin',
-            '混合备份：mysql_backup --bak-mode=2 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf --log-bin=/var/lib/mysql/mysql-bin',
-        ]),
-        formatter_class=type('CustomFormatter', (ArgumentDefaultsHelpFormatter, RawTextHelpFormatter), {}),
-    )
-    base_group = parser.add_argument_group(title='基础备份选项')
-    base_group.add_argument('--bak-mode', dest='bak_mode', type=int, default=0, help='0=数据，1=日志，2=数据+日志')
-    base_group.add_argument('--bak-dir', dest='bak_dir', type=str, help='备份文件目录')
-    base_group.add_argument('--keep', dest='keep', type=int, default=2, help='保留几周(>=1)')
-    data_group = parser.add_argument_group(title='数据备份选项')
-    data_group.add_argument('--weekday', dest='weekday', type=int, default=6, help='周几全量备份(1~7)')
-    data_group.add_argument('--my-cnf', dest='my_cnf', type=str, default='/etc/my.cnf', help='配置文件路径')
-    data_group.add_argument('--executor', dest='executor', type=str, default='xtrabackup', help='可执行文件：mariabackup, /usr/bin/xtrabackup')
-    logs_group = parser.add_argument_group(title='日志备份选项')
-    logs_group.add_argument('--log-bin', dest='log_bin', type=str, help="日志读取路径，show variables like 'log_bin_basename'")
-    args = parser.parse_args(argv)
-    return parser, args
-
-
-def run(args):
-    parser, args = parse_args(args)
-    print('input:', args.__dict__)
-    if not 0 <= args.bak_mode <= 2:
-        print(f'error: --bak-mode={args.bak_mode}')
-        parser.print_help()
-        sys.exit(1)
-    if args.bak_dir is None or not os.path.exists(args.bak_dir):
-        print(f'error: --bak-dir={args.bak_dir}')
-        parser.print_help()
-        sys.exit(1)
-    if args.keep < 1:
-        print(f'error: --keep={args.keep}')
-        parser.print_help()
-        sys.exit(1)
-    if os.system('which zstd') != 0:
-        print('error: command zstd is missing')
-        parser.print_help()
-        sys.exit(1)
-    if args.bak_mode in (0, 2):
-        if not 1 <= args.weekday <= 7:
-            print(f'error: --weekday={args.weekday}')
-            parser.print_help()
-            sys.exit(1)
-        if not os.path.exists(args.my_cnf):
-            print(f'error: --my-cnf={args.my_cnf}')
-            parser.print_help()
-            sys.exit(1)
-        if os.system(f'which {args.executor}') != 0 or not os.path.exists(args.executor):
-            print(f'error: command {args.executor} is missing')
-            parser.print_help()
-            sys.exit(1)
-        backup = DataBackup(args.bak_dir, args.keep, args.weekday, args.my_cnf, args.executor)
-        backup.run()
-    if args.bak_mode in (1, 2):
-        if args.log_bin is None:
-            print(f'error: --log-bin={args.log_bin}')
-            parser.print_help()
-            sys.exit(1)
-        backup = LogsBackup(args.bak_dir, args.keep, args.log_bin)
-        backup.run()
-
-
-if __name__ == '__main__':
-    run(sys.argv[1:])
