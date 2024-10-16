@@ -32,7 +32,7 @@ $ mysql_backup -h
 
 usage: mysql_backup [-h] [--bak-mode BAK_MODE] [--bak-dir BAK_DIR] [--keep KEEP] [--weekday WEEKDAY] [--my-cnf MY_CNF] [--executor EXECUTOR] [--log-bin LOG_BIN]
 
-MySQL周度全量、增量、日志备份，使用xtrabackup+zstd最佳组合，Version=v2.0.0
+MySQL周度全量、增量、日志备份，使用xtrabackup+zstd最佳组合，Version=v2.0.1
 数据备份：mysql_backup --bak-mode=0 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf
 日志备份：mysql_backup --bak-mode=1 --bak-dir=/backup --log-bin=/var/lib/mysql/mysql-bin
 混合备份：mysql_backup --bak-mode=2 --bak-dir=/backup --weekday=7 --my-cnf=/etc/my.cnf --log-bin=/var/lib/mysql/mysql-bin

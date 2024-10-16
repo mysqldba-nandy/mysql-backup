@@ -60,11 +60,6 @@ class Backup:
         # 备份类型
         raise
 
-    @property
-    def last_name(self):
-        # 上次备份
-        raise
-
     def filter(self, name: str):
         # 备份过滤
         raise
@@ -86,7 +81,7 @@ class DataBackup(Backup):
         tmp_name = os.path.join(self.base_dir, 'tmp_backup' + self.file_type)
         f, t = '0', ''
         if self.backup_type == BackupType.incr:
-            f = self.last_name.split('_')[3]
+            f = self.get_last_name().split('_')[3]
         cmd = f'{self.executor} --defaults-file={self.my_cnf} --backup --parallel=4 --stream=xbstream --target-dir=/tmp --incremental-lsn={f} | zstd -fkT4 -o {tmp_name}'
         print(datetime.datetime.now(), 'execute', cmd, flush=True)
         if self.dry_run:
@@ -124,12 +119,11 @@ class DataBackup(Backup):
         weekday = TODAY.isoweekday()
         days = weekday - self.weekday if weekday >= self.weekday else weekday - self.weekday + 7
         full_date = (TODAY - datetime.timedelta(days=days)).strftime(FORMAT)
-        if self.last_name.split('_')[0] < full_date:
+        if self.get_last_name().split('_')[0] < full_date:
             return BackupType.full
         return BackupType.incr
 
-    @property
-    def last_name(self):
+    def get_last_name(self):
         for name in reversed(self.history):
             if BackupType.full in name:
                 return name.replace(self.file_type, '')
@@ -147,7 +141,8 @@ class LogsBackup(Backup):
     def backup_cmd(self):
         log_dir, basename = os.path.split(self.log_bin)
         log_files = list(sorted(filter(lambda x: re.compile(basename + r'\.\d{6}').match(x), os.listdir(log_dir))))
-        last_max = self.last_name.split('_')[-1]
+        last_name = self.get_last_name()
+        last_max = last_name.split('_')[-1]
         if last_max == '':
             log_files = log_files[-1:]
         else:
@@ -161,7 +156,7 @@ class LogsBackup(Backup):
                 return
             os.system(cmd)
             if file == last_max:
-                os.remove(os.path.join(self.base_dir, self.last_name + self.file_type))
+                os.remove(os.path.join(self.base_dir, last_name + self.file_type))
 
     @property
     def base_dir(self):
@@ -179,8 +174,7 @@ class LogsBackup(Backup):
     def backup_type(self):
         return BackupType.logs
 
-    @property
-    def last_name(self):
+    def get_last_name(self):
         if len(self.history):
             return self.history[-1].replace(self.file_type, '')
         return ''
